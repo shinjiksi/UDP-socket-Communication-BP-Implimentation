@@ -1,0 +1,135 @@
+Introduction
+
+This assignment adds reliability to the features of P1.  The user's command-line interface for the sender and receiver remains the same as in P1. Your implementation of the Bronco Protocol (BP)  enables P2 to recover from the following problems:
+
+Lost datagram
+Duplicate datagram delivery
+Out-of-order datagram delivery
+Over-run
+Note that recovery from a corrupted datagram (e.g. received payload is not an objective.  In P2 you may assume the payload of a successfully delivered datagram was not damaged during transmission.  This is actually not a bad assumption because many if not most data links discard a frame received with an incorrect CRC.  After all... who really wants to use known-bad data.  Consequently, the destination host likely won't receive a frame damaged somewhere along the route.
+
+Bronco Protocol
+
+The P2 sender and receiver convey a single message of 0 .. 4,294,967,295 bytes of user data using the Bronco Protocol (BP) providing a reliable messaging service over the UDP datagram service.  The sender reads the message's data from stdin and transmits it as a sequence of numbered data segments.  The receiver assembles incoming segments into the correct sequence and writes the message data to stdout. 
+
+To address problems arising from lost datagrams, the receiver transmits numbered cumulative acknowledgments notifying the sender of successfully received data segments.  
+
+A variation of the window method implements flow control.
+
+The protocol header looks like this:
+
+Bronco Protocol Header
+
+segment number	acknowledgment
+flags	window	size
+data (optional)
+Every transmission includes the 20-byte required header.  The header fields are:
+
+Segment number.  A 16-bit unsigned little-endian integer value, the sequence number of this data segment if the DAT flag bit value is 1, ignored if the DAT flag bit is 0.  Sequence numbers enumerate segments (not bytes in the message a la TCP).  See discussion below for more detail about sequence numbers.  Transmitted from sender to receiver.
+Acknowledgment:  A 16-bit unsigned little-endian integer value, the sequence number of the last successfully received segment if the ACK flag bit value is 1, ignored if the ACK flag bit is 0.  Note that, unlike TCP, the acknowledgment number identifies the last received segment, not the next expected segment.  Transmitted from receiver to sender.
+Flags:  An 8-bit field of flag bits.  See flag bit discussion below.  Always included and examined in every segment.
+Window:  An 8-bit unsigned little-endian integer value, the number of segments the receiver is prepared to accept.  AKA a window advertisement.  See flow-control discussion below.  Transmitted in every segment from the receiver to the sender.
+Size:  A 16-bit unsigned little-endian integer value, the number of bytes of data transmitted in this data segment if the DAT flag bit is 1, ignored if the DAT flag bit is 0.  Transmitted from the sender to the receiver.
+Data:  0..512 bytes of optional message data.  Transmitted from the sender to the receiver.
+Flag Bits
+
+The BP header provides space for a maximum of 8 flag bits.  Unused bit positions are reserved for future use and their values are meaningless in P2.  The flag bits are:
+
+1....... DAT flag, indicates this segment contains message data and its sequence number field is valid
+.1...... ACK flag, indicates the segment whose sequence number appears in the acknowledgment field has been successfully received
+..1..... RWA flag, requests a window advertisement from the remote endpoint
+...1.... EOM flag, indicates this segment ends the current message
+
+Beginning of a Message
+
+The sender must transmit a segment to the receiver containing the RWA flag before transmitting any data segment(s).  The receiver will respond with a (window update) segment advertising the number of segments it is prepared to receive, after which the sender may begin transmitting data segments.  The sender is responsible for re-transmitting the RWA segment if it does not receive a window update segment from the receiver within a 10-second timeout interval.  The sender must not transmit a data segment until the receiver's window > 0.
+
+Normal Data Transfer
+
+The sender is allowed to transmit sequentially numbered data segments any time the receiver's advertised window size >= 1.  The receiver, at a time of its choosing, will transmit a segment with ACK==1 and an acknowledgment field containing the sequence number of the last successfully received data segment.  Data segments may contain 0..512 bytes of message data.
+
+Cumulative Acknowledgment 
+
+From time-to-time, UDP may fail to deliver a data segment to the receiver.  When this happens, the sender is responsible for recovery.  The sender starts a 10-second timer for an unacknowledged data segment.  Receipt of an acknowledgment for that or any subsequent segment cancels that timer.  If the timer for an unacknowledged segment expires, the sender starts a new timer and re-transmits that segment.
+
+Lost Acknowledgment 
+
+From time-to-time, UDP may fail to deliver an acknowledgment to the sender.  When this happens, the sender is responsible for recovery.  The sender will re-transmit the unacknowledged segment if its timer expires.  Alternatively, if the sender receives an acknowledgment for a subsequent data segment, the sender understands that the identified and all previous segments have been successfully received.
+
+Duplicate Data Segments
+
+From time-to-time, UDP may deliver a transmitted datagram more than once to the destination host.  The receiver identifies and discards duplicate data segments.
+
+Duplicate Acknowledgments 
+
+Likewise, a sender may receive and discard duplicate acknowledgments from the receiver.  
+
+Out-of-Order Delivery
+
+From time-to-time, UDP may deliver datagrams in an order different from their transmission.  The receiver may accept out-of-order data segments but must not acknowledge an unreceived data segment.  For example, if a sender receives data segments 0, 1, 2, 3, 5, 6, 7 and 8, it is free to acknowledge segment 3 but not any subsequent segment until segment 4 has arrived.  If segment 4 was lost, the sender is responsible for recovery as noted above.
+
+Flow Control and the Window Field
+
+The sender maintains a variable called, receiversWindowSize, whose value is initially zero when the program starts.  The receiver always transmits a valid window size in any segment to the sender.  The window field advertises the number of segments the receiver is prepared to accept.  The sender updates the receiversWindowSize with the receiver's advertised window size.  Each time the sender transmits a data segment, it decrements receiversWindowSize.  The sender pauses transmitting data segments when the receiversWIndowSize is 0.  The sender must resume transmitting data segments when the receiver advertises a window size > 0.  
+
+End of Message
+
+When a sender has no further data segments to transmit, it must transmit a segment containing the EOM flag set to 1.  The receiver must then acknowledge the last successfully received data segment if it has not already done so.  Note that the sender may need to re-transmit one of the last segments.  The connection is finished only after the sender has transmitted the EOM flag and the sender has received an acknowledgment for all data segments.
+
+Sender's State Diagram
+
+There are nuances of this assignment requiring your careful design and  benefiting from a state diagram similar to the attached illustration for the sender.  Here's a skeleton outline of a possible implementation for the sender (details and the receiver's implementation are left for the student:).
+
+When the sender starts, it initializes receiversWindowSize=0 and transmits a RWA segment to the receiver, and enters S0 to await a window advertisement from the receiver.
+
+S0 (Waiting for receiver to become ready): If the timer expires, the sender re-transmits the RWA segment to the receiver and waits.  When the sender receives a WIN > 0 (window advertisement) then it transitions to S1.
+
+S1 (Sending data segments): The sender loops transmitting data segments and decrementing the receiversWindowSize.  When the sender receives a WIN advertisement from the receiver, it sets the receiversWindowSize equal to the advertised value.  When receiversWIndowSize reaches 0, then the sender transitions to S2.  When the entire message has been transmitted, the sender enters S3.  When the sender receives an ACK-n (acknowledgment for segment, n), it frees all in-memory segments for sequence numbers <= n.  
+
+S2 (Paused):  The sender waits.  When it receives a WIN > 0 (window advertisement) it sets the receiversWindowSize equal to the advertised value and transitions to S1.  If the timer expires, the sender retransmits any unacknowledged segments.  When the sender receives an ACK-n (acknowledgment for segment, n), it frees all in-memory segments for sequence numbers <= n.
+
+S3 (Finishing):  The sender waits to receive ACKs for all transmitted data segments.  When the sender receives an ACK-n (acknowledgment for segment, n), it frees all segments for sequence numbers <= n.  When the timer expires, the sender retransmits any unacknowledged segments.  When there are no unacknowledged segments, the sender program exits.
+
+
+
+Misc Design Hints
+
+Use read() and write() to read from stdin and write to stdout.  The sender has more DAT segments to transmit if read() from stdin has not failed.  The sender transmits an EOM segment after all DAT segments have been sent and reading from stdin reaches EOF.
+
+Note that a receiver may combine ACK and WIN updates in a single transmission to the sender.
+
+If the sender has DAT segments to transmit and if receiversWindowSize permits, it should transmit and then listen for a response (e.g. a WIN advertisement or an ACK) from the receiver.  You might implement timeouts using SIGALRM (see, man signal and man setitimer for more detail); if the receiver doesn't respond, the timeout needs to trigger a retransmission of an outstanding segment.  On most Unix-like operating systems, SIGALRM should cause an outstanding system call to fail with EINTR.  See the description of ERRORS in man recvfrom.  The idea is for the sender to transmit every ready segment using sendto(), and then listen for the receiver's response using recvfrom and relying upon a pending SIGALRM to interrupt the recvfrom() API if the receiver fails to respond.
+
+A ten-second time-out interval will suffice for P2.
+
+You may wish to construct an ordered list of unacknowledged segments.  Each element in the list might reference the associated segment in memory.  When you receive a cumulative ACK for a segment, you could remove that and all previous segments from the list.  Since you likely will have only one timer, when it expires, you will need to retransmit all the segments in the list rather than just the one which timed-out awaiting an acknowledgment. 
+
+One of those nasty nuances is... what happens if the sender has received an acknowledgment for every transmitted DAT segment, the receiversWindowSize == 0, and the receiver's WIN advertisement has been lost?  In this case, the sender is hung awaiting a WIN > 0 segment from the receiver and that segment was lost.  Recall that the sender, not the receiver (who knows little about what's happening), is responsible for recovering from lost datagrams.  So... the sender's best course of option is to transmit a RWA segment (without any data); this should cause the receiver to re-transmit its WIN advertisement.
+
+Note that the receiver does not acknowledge an EOM segment (TCP handles this problem more reliably).  If the network loses the EOM segment, the receiver will hang as the sender may exit.
+
+
+
+
+
+Testing
+
+Real-world protocols can be tested with a network simulator that deliberately loses datagrams, duplicates datagrams, and delivers datagrams out-of-order.  The simulator lies in-between the two endpoints (e.g. our sender and receiver) and behaves as a black-box, a bad router, wrecking havoc with datagram delivery.  This is challenging in our academic environment as the simulator would be an additional program to design and write.  The only practical approach would be to form a team of two students, one writing the sender/receiver and another writing the simulator.  If you wish to use this approach, contact the instructor.  It is... a *very* effective testing approach for a protocol.
+
+White-box testing is an appropriate approach in CS425.  It is possible to implement a package of "triggers" in your receiver code that cause it to deliberately misbehave.  For example, to simulate lost segments, arrange for the receiver to, if a boolean trigger LOSESEGMENT is true, randomly discard received segments.  Your receiver can be implemented with secret debugging command line options like this:  receiver -LOSESEGMENT 12345.  Your code can simulate a duplicate packet by pretending to receive a segment twice given a boolean trigger, DUPLICATES.  Out-of-order delivery is more difficult -- I recommend using code reviews in CS425.  
+
+The grader will exercise 0 length messages, short messages (that reside entirely within a single data segment), and long messages (requiring thousands of data segments).  It will attempt to introduce network misbehavior through the use of an evil route.  It will confirm that the received message data matches the sent data.  It may use Wireshark to inspect datagrams for conformance to the protocol specification, and to verify that the receiver is opening a "large" window (of at least 5 segments) and the sender is filling that window with multiple DAT segments.
+
+Submission
+
+I can login to onyx again!  Please submit your source files and a single Makefile called, Makefile, to onyx:
+
+submit jimconrad cs425 p2
+
+P3
+
+Our last project may not involve any coding whatsoever if you *carefully* implement the P2 protocol specification.  P3 will ask you to test your sender and receiver implementations with other students' receiver and sender implementations.  Your score will be proportional to the number of successful interoperations you can achieve.  While it may sound like a simple testing exercise to  confirm  your code does what you already know it does, industry experience with interoperability testing (sometimes called a plug-fest) of real-world protocols has proven... challenging.  Protocols are ripe with nuances that trouble even senior network engineers, the experts in their fields, Things you can do in P2 to simplify P3 are... implement the protocol *exactly* as specified.  If you have a question or find a defect in the protocol, post questions on Piazza to find an answer/solution/workaround. 
+
+Extra Credit
+
+Real-world protocols go through the RFC process where they receive critical review and correction before becoming standards.  In CS425, extra credit points will be awarded to the first report of a defect in this spec that requires a correction.

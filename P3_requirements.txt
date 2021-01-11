@@ -1,0 +1,72 @@
+Introduction
+The objective of P3 is to get your sender and receiver working with other students' senders and receivers.  Assuming you followed the P2 spec carefully, this is mostly a testing and debugging exercise, but don't underestimate the challenge.
+ 
+Industry calls this exercise, Interoperability Testing.  Networking vendors meet at a chosen time and place in what's called a Plug Fest or Plug Test.  It's a bit of a festive, competitive atmosphere with tension introduced from working not only with your partners but with your company's competitors (think... Microsoft, Apple, Cisco, Juniper, Hewlett-Packard... all in the same room)!  Sometimes... you'll find someone feverishly working on their laptop, surrounded by take-out pizza boxes, to correct their mistaken interpretation of a network specification.  A real Plug Fest typically goes on for several days, to get organized, test for compatibility, negotiate points of contention when the right answer is not clear, resolve the bugs, and finally demonstrate everything you have working with as many other participants as possible.
+ 
+Procedure
+There is no new code to write (assuming you implemented the P2 specification carefully).  It really is just a test and debug exercise.
+ 
+Locate 1 or more collaborators from class to test your code with.  You may use piazza for finding collaborators.  You may also use piazza for coordinating bug fixes and resolving those "points of contention."
+Be sure your own source files are named sender.c and receiver.c and your makefile is named, Makefile
+Create a file called collaborators.txt with the last four digits of your student id in the first line of text.  As you find successful collaborators, append a line for each containing the last four digits of their student id.
+Rename your executable sender to be sender#### where #### is the last four digits of your student id number, and rename your receiver to be receiver#### where #### is the last four digits of your student id number.
+Verify that your own executable sender#### and receiver#### will pass all three test cases below.
+Share your working executable sender#### and receiver#### with your collaborators (who will also share their executables with you).  Just like in an industry plug fest, you won't be sharing your entire source code (with your company's competitors!).  But you are allowed to share snippets of working or failing code on piazza (where everyone in our class can see) to analyze problems.  Don't post entire source files.
+ 
+ 
+Test Cases
+All test cases should be exercised on onyx.  You may change the port numbers to any value between 1024 and 65535 (you don't have to use 12345).  The test files cited below are attached to this assignment in Blackbosrd.
+ 
+receiverNNNN 12345 >testout1.NNNN.MMMM & senderMMMM 127.0.0.1 12345 <testin1
+This test case exercises a short text file transfer between implementations NNNN and MMMM (the last four digits of students' id numbers, one of which is yours)
+Both processes should exit normally after which diff -s testin1 testout1.NNNN.MMMM should report the files identical
+senderNNNN 127.0.0.1 12345 <testin2 & receiverMMMM 12345 >testout2.NNNN.MMMM
+This test case exercises a long text flie transfer between implementations NNNN and MMMM (the last four digits of students' id numbers, one of which is yours)
+Both processes should exit normally after which diff -s testin2 testout2.NNNN.MMMM should report the files identical
+senderNNNN 127.0.0.1 12345 <testin3 & receiverMMMM 12345 >testout3.NNNN.MMMM
+This test case exercises the transfer of a zero length file between implementations NNNN and MMMM (the last four digits of students' id numbers, one of which is yours)
+Both processes should exit normally after which diff -s testin3 testout3.NNNN.MMMM should report the files identical
+Ensure that all of the executables exit normally (hangs result in lost points).
+ 
+Grading
+Your score is calculated from the number of successful test cases completed with other implementations of the sender and receiver.
+ 
+You receive 20 points for each test case (above) passing with your own sender#### and receiver####.  Even if your executables won't interoperate with those of anyone else, you can receive (a maximum of) 60 points for passing the three test cases without collaboration.
+You will receive an additional 5 points for each test case (above) that passes with a collaborator's implementation of their sender#### or receiver####.  For example, if your sender passes with one collaborator's receiver, you will receive 5 more points.  Likewise, if their sender passes with your receiver, you will receive another 5 points.  Thus, if that one test case passes using both collaborators' senders and receivers, then you'll receive 10 points.  If all three test cases pass with one collaborator (using both your own and their sender and receiver), then you'll receive 30 points for a total (maximum) score of 60+30=90 points.
+The maximum number of points available is 100 (you'll need more than one collaborator to achieve a perfect score).
+Hint:  You might wish to collaborate with several student to increase your chances of successful collaborations.  Also... see the extra credit section below.
+ 
+Sorry... I do not expect to be able to accept late [re]submissions at the semester's end.  Optimize the use of your time to score as many points as possible in the time you have available.
+ 
+Submission
+Use the onyx submit jimconrad cs425 p3 command to submit the files below:
+ 
+collaborators.txt -- A text file containing a line for each collaborator reporting that collaborator's last four digits of their student id number.  Your entry *must* be the first line.  Example:  If your student id ends with 1111 and you are submitting test results with collaborators 2222 and 3333, your file must contain three lines:
+1111
+2222
+3333
+sender.c
+sender#### -- the final version of your executable sender where #### is the last four digits of your student id
+senderNNNN -- A collaborator's exectuable sender where NNNN is the last four digits of their student id.  You may have several of these files if you tested with several collaborators.
+receiver.c
+receiver#### -- the final version of your executable receiver where #### is the last four digits of your student id
+receiverNNNN -- A collaborator's executable receiver where NNNN is the last four digits of their student id.  Again... you may have several of these files, each named differently, one for each collaborator.
+Makefile
+Any other files that might be required to rebuild your executables on onyx.
+testin1
+testin2
+testin3
+testout1.NNNN.MMMM -- the result of executing test case 1 with executable implementations named receiverNNNN and senderMMMM.  You will hopefully have several files like this.  ONLY SUBMIT THE RESULTS OF SUCCESSFUL TESTS (so the grader doesnt deduct points for failing collaborations -- if it doesn't work, don't submit it!).  For example, if your student id ends with 1111 and you tested both your sender and your receiver with a collaborator whose student id ends with 2222, then you'll submit testout1.1111.1111 (the result of testing your own executables), testout1.1111.2222 (the result of testing your receiver with 2222's sender), and testout.2222.1111 (the result of testing 2222's receiver with your sender).  
+testout2.NNNN.MMMM -- the result of executing test case 2 with executable implementations named senderNNNN and receiverMMMM.  As with the first test case, you will hopefully have several files like this.
+testout3.NNNN.MMMM -- the result of executing test case 3 with executable implementations named senderNNNN and receiverMMMM.  As with the other two test cases, you'll hopefully have several files like this.
+ 
+IMPORTANT:  Do not submit the results of failed collaborations.  Be sure to name all your files exactly as required above. 
+ 
+Keep it Fun
+There's a tendency for newbies to become judgemental and critical in Plug Fests ("You stupid idiot!  I wasted 6 hours finding *your* bug!").  But experienced attendees, previously humbled by experience, know they came looking for "points of contention," bugs, and meeting folks of like-mind.  The only bug that really matters is the one you ship to customers.  Help your collaborators debug, but don't give away your code.  Enjoy the Plug Fest, have fun finding and fixing each others' bugs, and run-up your score.
+ 
+Extra Credit
+As usual, extra credit points will be awarded for the first report of a defect that actually requires changing this spec.
+ 
+I will also award extra credit points to the submission passing the most tests with the most collaborators.
+
